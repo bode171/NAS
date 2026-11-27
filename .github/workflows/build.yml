@@ -1,0 +1,46 @@
+name: Windows-EXE bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pakete installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Selbsttest (Python)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python main.py --selftest
+
+      - name: EXE bauen
+        run: pyinstaller --noconfirm --onefile --windowed --name NAS main.py
+
+      - name: EXE zum Download bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: NAS-Windows
+          path: dist/NAS.exe
+
+      - name: Selbsttest (fertige EXE)
+        continue-on-error: true
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process -FilePath "dist\NAS.exe" -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content "dist\selbsttest.txt" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
